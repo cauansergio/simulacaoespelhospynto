@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulação de Espelhos Angulares</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; }
+        header { background: #2c3e50; color: white; padding: 20px; text-align: center; }
+        h1 { margin-bottom: 10px; }
+        .content { display: flex; flex-wrap: wrap; padding: 20px; }
+        .controls, .graph { padding: 20px; }
+        .controls { flex: 1; min-width: 300px; background: #f8f9fa; border-radius: 8px; }
+        .graph { flex: 2; min-width: 500px; }
+        .control-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="range"] { width: 100%; }
+        .value-display { display: flex; justify-content: space-between; font-size: 0.9em; color: #666; }
+        .input-group { display: flex; gap: 10px; margin-top: 10px; }
+        input[type="number"] { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; }
+        button:hover { background: #2980b9; }
+        .info-box { background: #e8f4fc; padding: 15px; border-radius: 5px; margin-top: 20px; border-left: 4px solid #3498db; }
+        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .stat-item { text-align: center; padding: 10px; background: white; border-radius: 5px; border: 1px solid #ddd; }
+        .stat-value { font-size: 1.5em; font-weight: bold; color: #2c3e50; }
+        
+        @media (max-width: 768px) {
+            .content { flex-direction: column; }
+            .controls, .graph { min-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📐 Simulação de Espelhos Angulares</h1>
+            <p>Explore a fórmula N = 360°/θ - 1</p>
+        </header>
+        
+        <div class="content">
+            <div class="controls">
+                <div class="control-group">
+                    <h3>⚙️ Configurações</h3>
+                    <label>Ângulo entre espelhos (θ): <span id="theta-value">60°</span></label>
+                    <input type="range" id="theta-slider" min="1" max="270" value="60" step="1">
+                    <div class="value-display"><span>1°</span><span>270°</span></div>
+                </div>
+                
+                <div class="control-group">
+                    <h3>🎯 Objeto</h3>
+                    <label>Distância (r): <span id="radius-value">3.0</span></label>
+                    <input type="range" id="radius-slider" min="0.5" max="4.5" value="3.0" step="0.1">
+                    <div class="value-display"><span>0.5</span><span>4.5</span></div>
+                    
+                    <label>Ângulo (φ): <span id="angle-value">30°</span></label>
+                    <input type="range" id="angle-slider" min="0" max="360" value="30" step="1">
+                    <div class="value-display"><span>0°</span><span>360°</span></div>
+                </div>
+                
+                <div class="input-group">
+                    <input type="number" id="theta-input" placeholder="Ângulo θ" value="60">
+                    <button onclick="updateFromInput()">Aplicar</button>
+                </div>
+                
+                <button onclick="updateSimulation()">🔄 Atualizar</button>
+                <button onclick="resetSimulation()">🔄 Resetar</button>
+                
+                <div class="info-box">
+                    <h3>📚 Fórmula</h3>
+                    <div id="formula-display">N = 360°/θ - 1</div>
+                    <p id="formula-calculation" style="margin-top: 10px;"></p>
+                </div>
+                
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="num-images">5</div>
+                        <div>Imagens</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="current-theta">60°</div>
+                        <div>Ângulo θ</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="graph">
+                <div id="plot" style="width: 100%; height: 500px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let config = { theta: 60, radius: 3.0, angle: 30 };
+        let plot = null;
+        
+        // Atualizar controles
+        ['theta', 'radius', 'angle'].forEach(id => {
+            const slider = document.getElementById(`${id}-slider`);
+            const value = document.getElementById(`${id}-value`);
+            
+            slider.addEventListener('input', function(e) {
+                config[id] = parseFloat(e.target.value);
+                value.textContent = config[id] + (id === 'theta' || id === 'angle' ? '°' : '');
+                if (id === 'theta') document.getElementById('theta-input').value = config.theta;
+                updateSimulation();
+            });
+        });
+        
+        function updateFromInput() {
+            const input = document.getElementById('theta-input');
+            if (input.value) {
+                config.theta = Math.min(270, Math.max(1, parseFloat(input.value)));
+                document.getElementById('theta-slider').value = config.theta;
+                document.getElementById('theta-value').textContent = config.theta + '°';
+                updateSimulation();
+            }
+        }
+        
+        function resetSimulation() {
+            config = { theta: 60, radius: 3.0, angle: 30 };
+            document.getElementById('theta-slider').value = config.theta;
+            document.getElementById('theta-value').textContent = config.theta + '°';
+            document.getElementById('radius-slider').value = config.radius;
+            document.getElementById('radius-value').textContent = config.radius;
+            document.getElementById('angle-slider').value = config.angle;
+            document.getElementById('angle-value').textContent = config.angle + '°';
+            document.getElementById('theta-input').value = config.theta;
+            updateSimulation();
+        }
+        
+        function updateSimulation() {
+            fetch('/calcular', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    updatePlot(data);
+                    updateInfo(data);
+                } else {
+                    console.error('Erro:', data.error);
+                }
+            })
+            .catch(err => console.error('Erro na requisição:', err));
+        }
+        
+        function updatePlot(data) {
+            const traces = [];
+            
+            // Espelhos
+            traces.push({
+                x: [data.espelho1[0].x, data.espelho1[1].x],
+                y: [data.espelho1[0].y, data.espelho1[1].y],
+                mode: 'lines',
+                line: {color: 'blue', width: 3},
+                name: 'Espelho 1'
+            });
+            
+            traces.push({
+                x: [data.espelho2[0].x, data.espelho2[1].x],
+                y: [data.espelho2[0].y, data.espelho2[1].y],
+                mode: 'lines',
+                line: {color: 'red', width: 3},
+                name: 'Espelho 2'
+            });
+            
+            // Objeto e imagens
+            const objeto = data.images.find(img => img.type === 'objeto');
+            const imagens = data.images.filter(img => img.type === 'imagem');
+            
+            traces.push({
+                x: [objeto.x],
+                y: [objeto.y],
+                mode: 'markers',
+                marker: {size: 12, color: 'green', line: {color: 'black', width: 2}},
+                name: 'Objeto'
+            });
+            
+            if (imagens.length > 0) {
+                traces.push({
+                    x: imagens.map(img => img.x),
+                    y: imagens.map(img => img.y),
+                    mode: 'markers',
+                    marker: {size: 8, color: 'red', opacity: 0.7},
+                    name: 'Imagens',
+                    text: imagens.map((img, i) => `Imagem ${i+1}`),
+                    hoverinfo: 'text'
+                });
+            }
+            
+            const layout = {
+                title: `θ = ${data.theta}°, r = ${data.obj_radius}, φ = ${data.obj_angle}°`,
+                xaxis: { title: 'X', range: [-5, 5], scaleanchor: 'y' },
+                yaxis: { title: 'Y', range: [-5, 5] },
+                showlegend: true,
+                plot_bgcolor: '#f8f9fa'
+            };
+            
+            if (plot) {
+                Plotly.react('plot', traces, layout);
+            } else {
+                plot = Plotly.newPlot('plot', traces, layout);
+            }
+        }
+        
+        function updateInfo(data) {
+            document.getElementById('formula-display').textContent = 'N = 360°/θ - 1';
+            document.getElementById('formula-calculation').textContent = data.formula;
+            document.getElementById('num-images').textContent = data.num_imagens;
+            document.getElementById('current-theta').textContent = data.theta + '°';
+        }
+        
+        // Iniciar
+        updateSimulation();
+    </script>
+</body>
+</html>
